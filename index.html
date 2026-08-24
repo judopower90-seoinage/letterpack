@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>レターパック 宛名ラベルメーカー</title>
+    
+    <!-- PWA & Favicon (〒・封筒・ペン 赤デザイン) -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%23d90429' rx='90'/%3E%3Cpath fill='%23ffffff' d='M140 88h232v36H140zm0 56h232v36H286v88h-60v-88H140z'/%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='24' stroke-linecap='round' stroke-linejoin='round' d='M110 230h115l35 30 35-30h107v170H110z'/%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='20' stroke-linecap='round' d='M110 240l150 110L367 240M110 400l105-85M402 400l-90-75'/%3E%3Cpath fill='%23ffffff' d='M440 200l-120 120-30 10 10-30L420 180z'/%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%23d90429' rx='90'/%3E%3Cpath fill='%23ffffff' d='M140 88h232v36H140zm0 56h232v36H286v88h-60v-88H140z'/%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='24' stroke-linecap='round' stroke-linejoin='round' d='M110 230h115l35 30 35-30h107v170H110z'/%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='20' stroke-linecap='round' d='M110 240l150 110L367 240M110 400l105-85M402 400l-90-75'/%3E%3Cpath fill='%23ffffff' d='M440 200l-120 120-30 10 10-30L420 180z'/%3E%3C/svg%3E">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Noto Sans JP', 'Inter', sans-serif;
+            background-color: #090d16;
+            color: #f1f5f9;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* 1:1 A4 実寸ミリメートル定義 (幅210mm x 高さ297mm) 
+           上下余白 54mm、左右余白 22mm で設定された領域 */
+        .a4-page {
+            width: 210mm;
+            height: 297mm;
+            background: white;
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 30px rgba(0, 0, 0, 0.3);
+            position: relative;
+            box-sizing: border-box;
+            padding: 54mm 22mm;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transform-origin: top center;
+            transition: transform 0.1s ease-out;
+            margin: 0 auto;
+        }
+
+        /* ラベル全体のサイズ制御 (設定余白内を100%専有) */
+        .label-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            box-sizing: border-box;
+            border: 1px dashed #cbd5e1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 印刷設定 (縮小防止・完全実寸出力) */
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 0;
+            }
+            body {
+                background: white !important;
+                color: black !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow: visible !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .no-print, header, #controlPanel, #resizerBar, #mobileTabBar {
+                display: none !important;
+            }
+            #mainSplitWrapper, #previewContainer, #a4ScalerOuter {
+                display: block !important;
+                position: static !important;
+                width: 210mm !important;
+                height: 297mm !important;
+                overflow: visible !important;
+                background: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                transform: none !important;
+            }
+            .a4-page {
+                box-shadow: none !important;
+                margin: 0 auto !important;
+                width: 210mm !important;
+                height: 297mm !important;
+                padding: 54mm 22mm !important;
+                box-sizing: border-box !important;
+                transform: scale(1) !important;
+                page-break-after: avoid !important;
+                page-break-inside: avoid !important;
+                display: flex !important;
+            }
+            .print-scale-target {
+                transform-origin: top center;
+                width: 100% !important;
+                height: 100% !important;
+            }
+        }
+
+        /* カスタム点線 */
+        .border-dashed-custom {
+            border-bottom: 1px dashed #94a3b8;
+        }
+
+        /* 郵便番号入力ボックス */
+        .zip-box {
+            width: 9.2mm;
+            height: 15mm;
+            border: 2px solid #e11d48;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            font-weight: 900;
+            color: #0f172a;
+            background-color: #ffffff;
+        }
+
+        /* 差出人郵便番号ミニボックス */
+        .from-zip-box {
+            width: 5.2mm;
+            height: 6.8mm;
+            border: 1.2px solid #334155;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 700;
+            color: #0f172a;
+            background-color: #ffffff;
+        }
+
+        /* スマートフォン入力時のズーム防止 */
+        @media (max-width: 1023px) {
+            input[type="text"], select {
+                font-size: 16px !important;
+            }
+        }
+
+        /* カスタムスクロールバー */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #e2e8f0;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 9999px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
+        /* 背景グリッドパターン */
+        .bg-grid-pattern {
+            background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+<body class="h-screen h-[100dvh] overflow-hidden bg-slate-950 flex flex-col antialiased">
+
+    <!-- トップヘッダー（印刷除外） -->
+    <header class="no-print bg-slate-900/90 backdrop-blur-md border-b border-slate-800 text-white px-4 py-2.5 shadow-xl flex-none z-50">
+        <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
+            
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-red-600 via-rose-500 to-amber-500 p-0.5 shadow-lg shadow-red-600/20">
+                    <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+                        <i class="fa-solid fa-paper-plane text-red-500 text-sm"></i>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <h1 class="text-sm sm:text-base font-black tracking-tight text-slate-100">レターパック 宛名ラベルメーカー</h1>
+                        <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>余白54/22mm 対応
+                        </span>
+                    </div>
+                    <p class="text-[10px] text-slate-400 hidden sm:block">A4配置 (上下余白54mm / 左右余白22mm) 実寸対応アプリ</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-2">
+                <!-- 印刷のコツヘルプボタン -->
+                <button onclick="togglePrintHelp()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1.5 rounded-xl border border-slate-700 text-xs font-bold transition flex items-center space-x-1">
+                    <i class="fa-solid fa-circle-question text-blue-400"></i>
+                    <span class="hidden sm:inline">印刷設定のコツ</span>
+                </button>
+
+                <!-- 種別切替 -->
+                <div class="bg-slate-950/80 p-1 rounded-xl border border-slate-800 flex items-center shadow-inner">
+                    <button id="modeLightBtn" onclick="setMode('light')" class="px-3 py-1 text-xs rounded-lg font-bold transition-all duration-200 flex items-center space-x-1.5 bg-blue-600 text-white shadow-md shadow-blue-600/30">
+                        <span class="w-2 h-2 rounded-full bg-blue-300"></span>
+                        <span>ライト (青)</span>
+                    </button>
+                    <button id="modePlusBtn" onclick="setMode('plus')" class="px-3 py-1 text-xs rounded-lg font-bold transition-all duration-200 flex items-center space-x-1.5 text-slate-400 hover:text-white">
+                        <span class="w-2 h-2 rounded-full bg-red-400"></span>
+                        <span>プラス (赤)</span>
+                    </button>
+                </div>
+
+                <!-- 印刷ボタン -->
+                <button onclick="window.print()" class="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold px-4 py-1.5 rounded-xl shadow-lg shadow-red-600/30 hover:shadow-red-600/50 transition-all duration-200 flex items-center space-x-2 text-xs border border-red-500/30">
+                    <i class="fa-solid fa-print text-sm"></i>
+                    <span>印刷する (A4)</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 印刷ヘルプモーダル -->
+    <div id="printHelpModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 no-print">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                <h3 class="font-bold text-sm text-slate-100 flex items-center space-x-2">
+                    <i class="fa-solid fa-print text-blue-400"></i>
+                    <span>100% 原寸で印刷するコツ</span>
+                </h3>
+                <button onclick="togglePrintHelp()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+
+            <div class="space-y-3 text-xs text-slate-300 leading-relaxed">
+                <div class="p-3 bg-blue-950/40 border border-blue-500/30 rounded-xl space-y-1">
+                    <div class="font-bold text-blue-300">✅ 縮小ズレを防ぐ手順</div>
+                    <p class="text-slate-400">ブラウザの印刷ダイアログで以下の2点を設定してください。<br>
+                    1. 印刷設定の余白を<b>「なし」</b>(None) に指定。<br>
+                    2. 倍率を<b>「100%」</b>（またはデフォルト）に指定。</p>
+                </div>
+                <div class="text-[11px] text-slate-400 pl-1">
+                    ※ 本アプリではA4用紙（210×297mm）に対して **左右余白 22mm / 上下余白 54mm** を確保して描画しています。
+                </div>
+            </div>
+
+            <button onclick="togglePrintHelp()" class="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition">了解しました</button>
+        </div>
+    </div>
+
+    <!-- スマホ用 タブ切り替えバー -->
+    <div id="mobileTabBar" class="lg:hidden flex bg-slate-900 border-b border-slate-800 p-1.5 gap-2 no-print flex-none z-40">
+        <button id="mobileTabFormBtn" onclick="switchMobileTab('form')" class="flex-1 py-2 text-xs font-bold rounded-xl text-white bg-gradient-to-r from-blue-600 to-indigo-600 shadow-md transition-all flex items-center justify-center space-x-1.5">
+            <i class="fa-solid fa-pen-to-square"></i>
+            <span>入力・アドレス帳</span>
+        </button>
+        <button id="mobileTabPreviewBtn" onclick="switchMobileTab('preview')" class="flex-1 py-2 text-xs font-bold rounded-xl text-slate-400 bg-slate-800 hover:text-white transition-all flex items-center justify-center space-x-1.5">
+            <i class="fa-solid fa-eye"></i>
+            <span>印刷プレビュー</span>
+        </button>
+    </div>
+
+    <!-- メイン split 領域 -->
+    <div id="mainSplitWrapper" class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+
+        <!-- 左側：入力コントロールパネル -->
+        <div id="controlPanel" class="no-print w-full lg:w-[50%] h-full bg-slate-100 border-r border-slate-300 flex flex-col z-10 shadow-lg text-slate-800">
+            
+            <div class="flex-1 overflow-y-auto p-3.5 sm:p-4 space-y-4 custom-scrollbar">
+
+                <!-- アドレス帳 -->
+                <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
+                    <div class="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                        <h2 class="font-bold text-xs sm:text-sm text-slate-800 flex items-center space-x-2">
+                            <span class="p-1 rounded-md bg-blue-50 text-blue-600 border border-blue-200">
+                                <i class="fa-solid fa-address-book text-xs"></i>
+                            </span>
+                            <span>アドレス帳 (保存された宛先)</span>
+                        </h2>
+                        <button onclick="saveCurrentToAddress()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1 rounded-lg transition-all shadow-sm flex items-center space-x-1">
+                            <i class="fa-solid fa-plus text-[10px]"></i>
+                            <span>宛先を保存</span>
+                        </button>
+                    </div>
+
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+                        <input type="text" id="addressSearchInput" oninput="renderAddressBook()" placeholder="名前・住所・電話番号で検索..." class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-all">
+                    </div>
+
+                    <div id="addressListContainer" class="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-1">
+                        <!-- JS動的生成 -->
+                    </div>
+                </div>
+
+                <!-- 印刷補正スケール -->
+                <div class="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-sm space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-bold text-slate-700 flex items-center space-x-2">
+                            <span class="p-1 rounded-md bg-indigo-50 text-indigo-600 border border-indigo-200">
+                                <i class="fa-solid fa-sliders text-xs"></i>
+                            </span>
+                            <span>印刷補正スケール (90% 〜 110%)</span>
+                        </label>
+                        <span id="scaleValueDisplay" class="text-xs font-black text-indigo-600 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-md font-mono">100.0%</span>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <input type="range" id="scaleSlider" min="90" max="110" step="0.1" value="100" oninput="updateScale(this.value)" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
+                        <button onclick="updateScale(100)" class="text-[11px] text-slate-500 hover:text-slate-800 underline whitespace-nowrap">100%リセット</button>
+                    </div>
+                </div>
+
+                <!-- お届け先 (To) フォーム -->
+                <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
+                    <h2 class="font-bold text-xs sm:text-sm text-slate-800 pb-2.5 border-b border-slate-100 flex items-center justify-between">
+                        <span class="flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-blue-600 shadow-sm inline-block"></span>
+                            <span>お届け先 (To)</span>
+                        </span>
+                        <button onclick="clearToForm()" class="text-xs text-rose-500 hover:text-rose-600 hover:underline transition">クリア</button>
+                    </h2>
+
+                    <div class="space-y-2.5 text-xs">
+                        <div>
+                            <label class="block font-medium text-slate-600 mb-1">郵便番号 (7桁)</label>
+                            <div class="flex space-x-2">
+                                <input type="text" id="toZip" value="1000001" placeholder="1000001" maxlength="7" oninput="formatAndLookupToZip(this.value)" class="flex-1 p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none font-mono text-sm tracking-wider">
+                                <button onclick="lookupZip('toZip', 'toAddress1')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl border border-slate-300 font-bold whitespace-nowrap transition-all flex items-center space-x-1">
+                                    <i class="fa-solid fa-magnifying-glass text-[10px]"></i>
+                                    <span>住所検索</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block font-medium text-slate-600 mb-1">住所1 (都道府県・市区町村・番地)</label>
+                            <input type="text" id="toAddress1" value="東京都千代田区千代田1-1" oninput="renderLabel()" placeholder="東京都千代田区千代田1-1" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-all">
+                        </div>
+
+                        <div>
+                            <label class="block font-medium text-slate-600 mb-1">住所2 (建物名・部屋番号)</label>
+                            <input type="text" id="toAddress2" value="皇居ビル 101号室" oninput="renderLabel()" placeholder="皇居ビル 101号室" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-all">
+                        </div>
+
+                        <div class="flex space-x-2">
+                            <div class="flex-1">
+                                <label class="block font-medium text-slate-600 mb-1">お名前</label>
+                                <input type="text" id="toName" value="日本 太郎" oninput="renderLabel()" placeholder="日本 太郎" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none font-bold transition-all">
+                            </div>
+                            <div class="w-24">
+                                <label class="block font-medium text-slate-600 mb-1">敬称</label>
+                                <select id="toHonorific" onchange="renderLabel()" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none font-bold transition-all">
+                                    <option value="様" selected>様</option>
+                                    <option value="御中">御中</option>
+                                    <option value="">(なし)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block font-medium text-slate-600 mb-1">電話番号</label>
+                            <input type="text" id="toTel" value="03-1234-5678" oninput="renderLabel()" placeholder="03-1234-5678" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none font-mono">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ご依頼主 (From) フォーム -->
+                <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
+                    <h2 class="font-bold text-xs sm:text-sm text-slate-800 pb-2.5 border-b border-slate-100 flex items-center justify-between">
+                        <span class="flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-slate-500 inline-block"></span>
+                            <span>ご依頼主 (From)</span>
+                        </span>
+                        <button onclick="saveSenderAddress()" class="text-xs text-blue-600 hover:underline transition">差出人を保存</button>
+                    </h2>
+
+                    <div class="space-y-2.5 text-xs">
+                        <div>
+                            <label class="block font-medium text-slate-600 mb-1">郵便番号 (7桁)</label>
+                            <div class="flex space-x-2">
+                                <input type="text" id="fromZip" value="1600023" placeholder="1000001" maxlength="7" oninput="formatAndLookupFromZip(this.value)" class="flex-1 p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none font-mono text-sm tracking-wider">
+                                <button onclick="lookupZip('fromZip', 'fromAddress1')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl border border-slate-300 font-bold whitespace-nowrap transition-all flex items-center space-x-1">
+                                    <i class="fa-solid fa-magnifying-glass text-[10px]"></i>
+                                    <span>住所検索</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block font-medium text-slate-600 mb-1">住所1</label>
+                            <input type="text" id="fromAddress1" value="東京都新宿区西新宿2-8-1" oninput="renderLabel()" placeholder="東京都新宿区西新宿2-8-1" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-all">
+                        </div>
+
+                        <div>
+                            <label class="block font-medium text-slate-600 mb-1">住所2</label>
+                            <input type="text" id="fromAddress2" value="都庁第一本庁舎 20F" oninput="renderLabel()" placeholder="都庁第一本庁舎" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-all">
+                        </div>
+
+                        <div>
+                            <label class="block font-medium text-slate-600 mb-1">お名前</label>
+                            <input type="text" id="fromName" value="差出 健太" oninput="renderLabel()" placeholder="差出 健太" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none font-bold transition-all">
+                        </div>
+
+                        <div>
+                            <label class="block font-medium text-slate-600 mb-1">電話番号</label>
+                            <input type="text" id="fromTel" value="090-9876-5432" oninput="renderLabel()" placeholder="090-9876-5432" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none font-mono">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 品名フォーム -->
+                <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
+                    <h2 class="font-bold text-xs sm:text-sm text-slate-800 pb-2.5 border-b border-slate-100">
+                        <span>品名 (Contents Description)</span>
+                    </h2>
+
+                    <div class="space-y-2.5 text-xs">
+                        <div class="flex flex-wrap gap-1.5">
+                            <button onclick="setPresetItem('書類')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition-all">📄 書類</button>
+                            <button onclick="setPresetItem('衣類')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition-all">👔 衣類</button>
+                            <button onclick="setPresetItem('書籍・本')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition-all">📚 書籍</button>
+                            <button onclick="setPresetItem('化粧品（ノンアルコール）')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition-all">💄 化粧品</button>
+                            <button onclick="setPresetItem('ゲームソフト / CD')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition-all">🎮 CD/DVD</button>
+                        </div>
+
+                        <input type="text" id="itemContents" value="書類 (契約書)" oninput="renderLabel()" placeholder="例: 書類 (契約書)" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none font-bold transition-all">
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- 可動リサイザーバー（PC時） -->
+        <div id="resizerBar" class="hidden lg:flex w-2 bg-slate-800 hover:bg-blue-600 cursor-col-resize no-print items-center justify-center transition-colors z-20">
+            <div class="w-0.5 h-8 bg-slate-500 rounded"></div>
+        </div>
+
+        <!-- 右側：画面サイズ自動フィット・プレビュー領域 -->
+        <div id="previewContainer" class="hidden lg:flex flex-1 bg-slate-950 bg-grid-pattern relative overflow-hidden flex-col items-center justify-start p-3 w-full h-full">
+            
+            <!-- プレビュー制御バー -->
+            <div class="no-print w-auto mb-3 flex items-center justify-between gap-4 text-xs bg-slate-900/90 backdrop-blur-md px-4 py-2 rounded-2xl border border-slate-800 shadow-2xl z-20">
+                <div class="flex items-center space-x-2">
+                    <span class="relative flex h-2.5 w-2.5">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </span>
+                    <span class="font-bold text-slate-200 tracking-wide text-xs">PRINT CANVAS (余白 54mm / 22mm)</span>
+                </div>
+                
+                <div class="flex items-center space-x-1.5">
+                    <button onclick="setFitMode('auto')" id="fitAutoBtn" class="px-3 py-1 rounded-lg font-bold text-[11px] bg-blue-600 text-white shadow-md shadow-blue-600/30 transition-all">
+                        <i class="fa-solid fa-expand mr-1"></i>画面フィット
+                    </button>
+                    <button onclick="setFitMode('100')" id="fit100Btn" class="px-3 py-1 rounded-lg font-bold text-[11px] bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700 transition-all">
+                        原寸100%
+                    </button>
+                </div>
+            </div>
+
+            <!-- スケーリング計算用外枠スクロールラッパー -->
+            <div id="a4ScalerOuter" class="w-full flex-1 flex justify-center items-start overflow-auto custom-scrollbar relative py-1">
+                
+                <!-- A4 印刷キャンバス (実寸 210mm × 297mm, 上下余白54mm, 左右余白22mm) -->
+                <div id="a4Canvas" class="a4-page">
+                    
+                    <!-- 印刷補正用スケーリングラッパー -->
+                    <div id="printScaleWrapper" class="print-scale-target flex flex-col items-center justify-center w-full h-full">
+                        
+                        <!-- ラベルコンテナ (余白内を全画面100%専有) -->
+                        <div class="label-container w-full h-full flex flex-col justify-between">
+                            
+                            <!-- 1. 最上部：郵便番号エリア (全幅84mm, 縦15mm, 赤枠 3桁-4桁) -->
+                            <div class="w-full flex justify-end items-end relative flex-none" style="height: 15mm;">
+                                <div class="flex items-center space-x-1" style="width: 84mm; height: 15mm;">
+                                    <div id="zipBox0" class="zip-box flex-1"></div>
+                                    <div id="zipBox1" class="zip-box flex-1"></div>
+                                    <div id="zipBox2" class="zip-box flex-1"></div>
+                                    
+                                    <div class="text-rose-600 font-bold text-lg px-0.5 flex items-center justify-center">-</div>
+                                    
+                                    <div id="zipBox3" class="zip-box flex-1"></div>
+                                    <div id="zipBox4" class="zip-box flex-1"></div>
+                                    <div id="zipBox5" class="zip-box flex-1"></div>
+                                    <div id="zipBox6" class="zip-box flex-1"></div>
+                                </div>
+                            </div>
+
+                            <!-- 郵便番号とメイン枠の間の隙間 (11mm) -->
+                            <div class="flex-none" style="height: 11mm;"></div>
+
+                            <!-- 2. メイン黒枠エリア (残り高さを100%全画面専有) -->
+                            <div class="w-full flex-1 flex flex-col border-[2.5px] border-black bg-white overflow-hidden" style="box-sizing: border-box;">
+                                
+                                <!-- 上段＋中段 (127.5mm) : お届け先(75mm) + ご依頼主(52.5mm) -->
+                                <div class="w-full flex flex-row flex-none" style="height: 127.5mm;">
+                                    
+                                    <!-- 左側サイドバー (幅38mm) -->
+                                    <div class="flex flex-col border-r-[2.5px] border-black flex-none" style="width: 38mm; box-sizing: border-box;">
+                                        
+                                        <!-- 【お届け先 To サイドバー】 (高さ 75mm, 上端から25mm位置) -->
+                                        <div id="toSidebar" class="bg-blue-600 text-white flex flex-col items-center justify-start relative overflow-hidden" style="height: 75mm; box-sizing: border-box;">
+                                            <div class="text-center w-full" style="padding-top: 25mm;">
+                                                <div class="font-bold tracking-wider leading-none" style="font-size: 13.5px;">お届け先</div>
+                                                <div class="font-black leading-none mt-1" style="font-size: 32px; font-family: sans-serif;">To</div>
+                                            </div>
+
+                                            <div class="flex flex-col items-center w-full absolute bottom-0 left-0 right-0">
+                                                <div class="w-0 h-0 border-l-[18px] border-l-transparent border-r-[18px] border-r-transparent border-b-[22px] border-b-white"></div>
+                                                <div class="w-[13px] bg-white" style="height: 20mm;"></div>
+                                            </div>
+                                        </div>
+
+                                        <div class="w-full border-b-[2.5px] border-black"></div>
+
+                                        <!-- 【ご依頼主 From サイドバー】 (高さ 52.5mm, 上下左右中心配置) -->
+                                        <div id="fromSidebar" class="bg-blue-200 text-slate-900 flex flex-col items-center justify-center relative overflow-hidden flex-1" style="box-sizing: border-box;">
+                                            <div class="flex flex-col items-center space-y-[2.5px] w-full pt-0">
+                                                <div id="dashBlock1" class="w-[13px] h-[5px] bg-blue-600"></div>
+                                                <div id="dashBlock2" class="w-[13px] h-[5px] bg-blue-600"></div>
+                                                <div id="dashBlock3" class="w-[13px] h-[5px] bg-blue-600"></div>
+                                                <div id="dashBlock4" class="w-[13px] h-[5px] bg-blue-600"></div>
+                                            </div>
+
+                                            <div class="text-center mt-2">
+                                                <div class="font-bold tracking-wider leading-none text-black" style="font-size: 13.5px;">ご依頼主</div>
+                                                <div class="font-black leading-none mt-1 tracking-tight text-black" style="font-size: 32px; font-family: sans-serif;">From</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- 右側メイン記入エリア (幅 121mm) -->
+                                    <div class="flex-1 flex flex-col" style="box-sizing: border-box;">
+                                        
+                                        <!-- 【お届け先 (To) 右エリア】 (高さ 75mm) : 3行等間隔 ＋ 様を右下に寄せる -->
+                                        <div class="flex flex-col relative px-3 py-1.5 justify-between" style="height: 75mm; box-sizing: border-box;">
+                                            
+                                            <!-- 1行目: おところ (住所1) -->
+                                            <div class="flex-1 flex flex-col justify-between pb-1">
+                                                <div class="text-slate-900 leading-tight">
+                                                    <span class="font-bold text-xs block">おところ:</span>
+                                                    <span class="font-bold text-[10px] text-slate-700 block -mt-0.5">Address</span>
+                                                </div>
+                                                <div id="displayToAddress1" class="text-sm font-bold pl-2 text-slate-900 truncate min-h-[18px]"></div>
+                                            </div>
+                                            <div class="border-dashed-custom"></div>
+
+                                            <!-- 2行目: 住所2 -->
+                                            <div class="flex-1 flex flex-col justify-end pb-1">
+                                                <div id="displayToAddress2" class="text-sm font-bold pl-2 text-slate-900 truncate min-h-[18px]"></div>
+                                            </div>
+                                            <div class="border-dashed-custom"></div>
+
+                                            <!-- 3行目: おなまえ ＆ 右下に敬称(様) -->
+                                            <div class="flex-1 flex flex-col justify-between pb-1 relative">
+                                                <div class="text-slate-900 leading-tight">
+                                                    <span class="font-bold text-xs block">おなまえ:</span>
+                                                    <span class="font-bold text-[10px] text-slate-700 block -mt-0.5">Name</span>
+                                                </div>
+                                                <div class="flex items-baseline justify-between pl-4 pr-2">
+                                                    <div id="displayToName" class="text-lg font-black text-slate-950 truncate flex-1 pr-2"></div>
+                                                    <div id="displayToHonorific" class="font-black text-xl text-black whitespace-nowrap">様</div>
+                                                </div>
+                                            </div>
+                                            <div class="border-dashed-custom"></div>
+
+                                            <!-- 4行目: 電話番号 (市外局番-市内局番-末尾4桁) -->
+                                            <div class="flex items-center text-xs font-bold text-slate-900 pt-1">
+                                                <div class="mr-2 whitespace-nowrap">
+                                                    <span class="block text-xs font-bold">電話番号:</span>
+                                                    <span class="block text-[9px] text-slate-700 -mt-0.5">Telephone Number</span>
+                                                </div>
+                                                <div id="displayToTel" class="flex-1 text-center font-mono text-sm tracking-widest font-bold text-slate-950"></div>
+                                            </div>
+                                        </div>
+
+                                        <div class="w-full border-b-[2.5px] border-black"></div>
+
+                                        <!-- 【ご依頼主 (From) 右エリア】 (高さ 52.5mm) -->
+                                        <div class="flex flex-col relative px-3 py-1.5 justify-between" style="height: 52.5mm; box-sizing: border-box;">
+                                            <div class="flex items-center justify-between">
+                                                <div>
+                                                    <span class="font-bold text-xs block">おところ:</span>
+                                                    <span class="font-bold text-[10px] text-slate-700 block -mt-0.5">Address</span>
+                                                </div>
+
+                                                <div class="flex items-center space-x-0.5">
+                                                    <div id="fZip0" class="from-zip-box"></div>
+                                                    <div id="fZip1" class="from-zip-box"></div>
+                                                    <div id="fZip2" class="from-zip-box"></div>
+                                                    <div class="text-slate-800 text-xs px-0.5 font-bold">-</div>
+                                                    <div id="fZip3" class="from-zip-box"></div>
+                                                    <div id="fZip4" class="from-zip-box"></div>
+                                                    <div id="fZip5" class="from-zip-box"></div>
+                                                    <div id="fZip6" class="from-zip-box"></div>
+                                                </div>
+                                            </div>
+
+                                            <div id="displayFromAddress1" class="text-xs font-bold pl-2 text-slate-900 truncate min-h-[14px]"></div>
+                                            <div class="border-dashed-custom"></div>
+
+                                            <div id="displayFromAddress2" class="text-xs font-bold pl-2 text-slate-900 truncate min-h-[14px]"></div>
+                                            <div class="border-dashed-custom"></div>
+
+                                            <div class="flex items-center justify-between">
+                                                <div>
+                                                    <span class="font-bold text-xs inline-block">おなまえ:</span>
+                                                    <span class="font-bold text-[9px] text-slate-700 inline-block ml-1">Name</span>
+                                                </div>
+                                                <div id="displayFromName" class="text-sm font-bold pr-4 text-slate-900 truncate flex-1 text-right"></div>
+                                            </div>
+                                            <div class="border-dashed-custom"></div>
+
+                                            <div class="flex items-center text-xs font-bold text-slate-900">
+                                                <div class="mr-2 whitespace-nowrap">
+                                                    <span class="block text-xs font-bold">電話番号:</span>
+                                                    <span class="block text-[9px] text-slate-700 -mt-0.5">Telephone Number</span>
+                                                </div>
+                                                <div id="displayFromTel" class="flex-1 text-center font-mono text-xs tracking-widest font-bold text-slate-950"></div>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+
+                                <div class="w-full border-b-[2.5px] border-black"></div>
+
+                                <!-- 【下段：品名エリア (Contents Description)】 (全幅 159mm, 残り領域を100%満たす) -->
+                                <div class="w-full bg-white px-3 py-1.5 flex flex-col justify-between flex-1 relative overflow-hidden" style="box-sizing: border-box;">
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <div class="font-black text-xs text-slate-900 tracking-tight">
+                                                品名 : Contents Description
+                                            </div>
+                                            <div class="text-[9.5px] font-bold text-rose-600 leading-tight mt-0.5">
+                                                現金を送ることはできません。
+                                            </div>
+                                            <div class="text-[8.5px] font-medium text-slate-800 leading-none">
+                                                Cannot be used to send cash.
+                                            </div>
+                                        </div>
+
+                                        <div class="text-[8px] font-bold text-slate-800 max-w-[82mm] text-right leading-tight">
+                                            品名の記載が無い場合または内容品によっては、配達が遅れる場合があります。<br>
+                                            <span class="text-[7px] font-normal text-slate-600 block mt-0.5">Without a description or depending on the contents, delivery could be delayed.</span>
+                                        </div>
+                                    </div>
+
+                                    <div id="displayItemContents" class="text-base font-black text-slate-950 px-2 py-0.5 min-h-[12mm] flex items-center"></div>
+                                </div>
+
+                            </div>
+                            
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        let currentMode = 'light';
+        let fitMode = 'auto';
+        let selectedAddressId = 'addr_1';
+        let activeMobileTab = 'form';
+
+        // 初期アドレス帳サンプルデータ
+        const defaultAddressBook = [
+            {
+                id: 'addr_1',
+                title: '東京本社 (サンプル)',
+                zip: '1000001',
+                addr1: '東京都千代田区千代田1-1',
+                addr2: '皇居ビル 101号室',
+                name: '日本 太郎',
+                honorific: '様',
+                tel: '03-1234-5678'
+            },
+            {
+                id: 'addr_2',
+                title: '大阪支社 (サンプル)',
+                zip: '5300001',
+                addr1: '大阪府大阪市北区梅田1-1-3',
+                addr2: '大阪駅前ビル 5F',
+                name: '浪速 商事株式会社',
+                honorific: '御中',
+                tel: '06-6789-0123'
+            }
+        ];
+
+        // アプリ起動時の初期化
+        window.addEventListener('DOMContentLoaded', () => {
+            initAddressBook();
+            loadSavedSender();
+            renderLabel();
+            initResizer();
+
+            setTimeout(() => {
+                renderLabel();
+                fitPreviewToScreen();
+            }, 100);
+
+            window.addEventListener('resize', () => {
+                fitPreviewToScreen();
+            });
+
+            window.addEventListener('orientationchange', () => {
+                setTimeout(fitPreviewToScreen, 200);
+            });
+        });
+
+        // 印刷ヘルプモーダル表示
+        function togglePrintHelp() {
+            const modal = document.getElementById('printHelpModal');
+            if (modal) modal.classList.toggle('hidden');
+        }
+
+        // スマホ用タブ切り替え
+        function switchMobileTab(tab) {
+            activeMobileTab = tab;
+            const controlPanel = document.getElementById('controlPanel');
+            const previewContainer = document.getElementById('previewContainer');
+            const formBtn = document.getElementById('mobileTabFormBtn');
+            const previewBtn = document.getElementById('mobileTabPreviewBtn');
+
+            if (!controlPanel || !previewContainer || !formBtn || !previewBtn) return;
+
+            if (tab === 'form') {
+                controlPanel.classList.remove('hidden');
+                previewContainer.classList.add('hidden');
+                previewContainer.classList.remove('flex');
+
+                formBtn.className = "flex-1 py-2 text-xs font-bold rounded-xl text-white bg-gradient-to-r from-blue-600 to-indigo-600 shadow-md transition-all flex items-center justify-center space-x-1.5";
+                previewBtn.className = "flex-1 py-2 text-xs font-bold rounded-xl text-slate-400 bg-slate-800 hover:text-white transition-all flex items-center justify-center space-x-1.5";
+            } else {
+                controlPanel.classList.add('hidden');
+                previewContainer.classList.remove('hidden');
+                previewContainer.classList.add('flex');
+
+                formBtn.className = "flex-1 py-2 text-xs font-bold rounded-xl text-slate-400 bg-slate-800 hover:text-white transition-all flex items-center justify-center space-x-1.5";
+                previewBtn.className = "flex-1 py-2 text-xs font-bold rounded-xl text-white bg-gradient-to-r from-blue-600 to-indigo-600 shadow-md transition-all flex items-center justify-center space-x-1.5";
+
+                setTimeout(() => {
+                    fitPreviewToScreen();
+                }, 50);
+            }
+        }
+
+        // 可動リサイザーバー（PC画面）
+        function initResizer() {
+            const resizer = document.getElementById('resizerBar');
+            const leftPanel = document.getElementById('controlPanel');
+            const mainWrapper = document.getElementById('mainSplitWrapper');
+
+            if (!resizer || !leftPanel || !mainWrapper) return;
+
+            let isMd = window.matchMedia('(min-width: 1024px)').matches;
+            if (isMd) {
+                leftPanel.style.width = '50%';
+            }
+
+            let isResizing = false;
+
+            resizer.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isResizing) return;
+                const containerWidth = mainWrapper.clientWidth;
+                let leftWidth = (e.clientX / containerWidth) * 100;
+                
+                if (leftWidth < 25) leftWidth = 25;
+                if (leftWidth > 75) leftWidth = 75;
+
+                leftPanel.style.width = `${leftWidth}%`;
+                fitPreviewToScreen();
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isResizing) {
+                    isResizing = false;
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                }
+            });
+        }
+
+        // アドレス帳機能
+        function getAddressBook() {
+            try {
+                const data = localStorage.getItem('letterpack_address_book');
+                return data ? JSON.parse(data) : defaultAddressBook;
+            } catch (e) {
+                return defaultAddressBook;
+            }
+        }
+
+        function initAddressBook() {
+            if (!localStorage.getItem('letterpack_address_book')) {
+                localStorage.setItem('letterpack_address_book', JSON.stringify(defaultAddressBook));
+            }
+            renderAddressBook();
+        }
+
+        function renderAddressBook() {
+            const listContainer = document.getElementById('addressListContainer');
+            if (!listContainer) return;
+
+            const searchEl = document.getElementById('addressSearchInput');
+            const keyword = (searchEl ? searchEl.value : '').toLowerCase().trim();
+            const book = getAddressBook();
+
+            const filtered = book.filter(item => {
+                if (!keyword) return true;
+                return (item.name && item.name.toLowerCase().includes(keyword)) ||
+                       (item.addr1 && item.addr1.toLowerCase().includes(keyword)) ||
+                       (item.addr2 && item.addr2.toLowerCase().includes(keyword)) ||
+                       (item.zip && item.zip.includes(keyword)) ||
+                       (item.tel && item.tel.includes(keyword)) ||
+                       (item.title && item.title.toLowerCase().includes(keyword));
+            });
+
+            if (filtered.length === 0) {
+                listContainer.innerHTML = `<div class="text-center py-4 text-slate-400 text-xs">該当する宛先がありません</div>`;
+                return;
+            }
+
+            listContainer.innerHTML = filtered.map(item => {
+                const isChecked = (selectedAddressId === item.id);
+                return `
+                    <div onclick="selectAddress('${item.id}')" class="group flex items-start justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${isChecked ? 'bg-blue-50 border-blue-400 shadow-sm ring-1 ring-blue-300' : 'bg-slate-50 hover:bg-slate-100 border-slate-200'}">
+                        <div class="flex items-start space-x-2.5 flex-1 min-w-0 pr-1">
+                            <div class="mt-0.5 font-bold text-sm text-blue-600">
+                                ${isChecked ? '<i class="fa-solid fa-circle-check text-blue-600"></i>' : '<i class="fa-regular fa-circle text-slate-400"></i>'}
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-bold text-xs text-slate-800 truncate">${escapeHtml(item.name || '名前未入力')} ${escapeHtml(item.honorific || '')}</span>
+                                    <span class="text-[10px] font-mono text-slate-500 ml-1">〒${formatZip(item.zip)}</span>
+                                </div>
+                                <div class="text-[11px] text-slate-600 truncate mt-0.5">${escapeHtml(item.addr1 || '')} ${escapeHtml(item.addr2 || '')}</div>
+                            </div>
+                        </div>
+                        <button onclick="event.stopPropagation(); deleteAddress('${item.id}')" title="削除" class="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg transition-all">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectAddress(id) {
+            selectedAddressId = id;
+            const book = getAddressBook();
+            const target = book.find(b => b.id === id);
+
+            if (target) {
+                document.getElementById('toZip').value = target.zip || '';
+                document.getElementById('toAddress1').value = target.addr1 || '';
+                document.getElementById('toAddress2').value = target.addr2 || '';
+                document.getElementById('toName').value = target.name || '';
+                document.getElementById('toHonorific').value = target.honorific !== undefined ? target.honorific : '様';
+                document.getElementById('toTel').value = target.tel || '';
+                renderLabel();
+            }
+
+            renderAddressBook();
+        }
+
+        function saveCurrentToAddress() {
+            const zip = document.getElementById('toZip').value.trim();
+            const addr1 = document.getElementById('toAddress1').value.trim();
+            const addr2 = document.getElementById('toAddress2').value.trim();
+            const name = document.getElementById('toName').value.trim();
+            const honorific = document.getElementById('toHonorific').value;
+            const tel = document.getElementById('toTel').value.trim();
+
+            if (!name && !addr1) {
+                alert('お名前または住所を入力してください。');
+                return;
+            }
+
+            const book = getAddressBook();
+            const newId = 'addr_' + Date.now();
+            const newEntry = { id: newId, zip, addr1, addr2, name, honorific, tel };
+
+            book.unshift(newEntry);
+            localStorage.setItem('letterpack_address_book', JSON.stringify(book));
+            selectedAddressId = newId;
+
+            renderAddressBook();
+            alert('アドレス帳にお届け先を保存しました。');
+        }
+
+        function deleteAddress(id) {
+            if (!confirm('この宛先を削除してもよろしいですか？')) return;
+            let book = getAddressBook();
+            book = book.filter(item => item.id !== id);
+            localStorage.setItem('letterpack_address_book', JSON.stringify(book));
+
+            if (selectedAddressId === id) {
+                selectedAddressId = null;
+            }
+            renderAddressBook();
+        }
+
+        // プレビュー表示レスポンシブ最適化
+        function setFitMode(mode) {
+            fitMode = mode;
+            const autoBtn = document.getElementById('fitAutoBtn');
+            const btn100 = document.getElementById('fit100Btn');
+
+            if (!autoBtn || !btn100) return;
+
+            if (mode === 'auto') {
+                autoBtn.className = "px-3 py-1 rounded-lg font-bold text-[11px] bg-blue-600 text-white shadow-md shadow-blue-600/30 transition-all";
+                btn100.className = "px-3 py-1 rounded-lg font-bold text-[11px] bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700 transition-all";
+            } else {
+                autoBtn.className = "px-3 py-1 rounded-lg font-bold text-[11px] bg-slate-800 text-slate-300 hover:text-white transition-all";
+                btn100.className = "px-3 py-1 rounded-lg font-bold text-[11px] bg-blue-600 text-white shadow-md shadow-blue-600/30 transition-all";
+            }
+            fitPreviewToScreen();
+        }
+
+        function fitPreviewToScreen() {
+            const canvas = document.getElementById('a4Canvas');
+            const container = document.getElementById('previewContainer');
+
+            if (!canvas || !container) return;
+
+            if (fitMode === '100') {
+                canvas.style.transform = `scale(1)`;
+                return;
+            }
+
+            const a4WidthPx = 794;
+            const a4HeightPx = 1123;
+
+            let availW = container.clientWidth - 20;
+            let availH = container.clientHeight - 60;
+
+            if (availW <= 0 || availH <= 0) {
+                availW = window.innerWidth - 20;
+                availH = window.innerHeight - 110;
+            }
+
+            if (availW <= 0 || availH <= 0) return;
+
+            const scaleX = availW / a4WidthPx;
+            const scaleY = availH / a4HeightPx;
+            let finalScale = Math.min(scaleX, scaleY);
+
+            if (finalScale > 1.15) finalScale = 1.15;
+            if (finalScale < 0.20) finalScale = 0.20;
+
+            canvas.style.transform = `scale(${finalScale})`;
+        }
+
+        // 種別切替 (ライト青 / プラス赤)
+        function setMode(mode) {
+            currentMode = mode;
+            const lightBtn = document.getElementById('modeLightBtn');
+            const plusBtn = document.getElementById('modePlusBtn');
+            const toSidebar = document.getElementById('toSidebar');
+            const fromSidebar = document.getElementById('fromSidebar');
+            const dash1 = document.getElementById('dashBlock1');
+            const dash2 = document.getElementById('dashBlock2');
+            const dash3 = document.getElementById('dashBlock3');
+            const dash4 = document.getElementById('dashBlock4');
+
+            if (!lightBtn || !plusBtn || !toSidebar || !fromSidebar) return;
+
+            if (mode === 'light') {
+                lightBtn.className = 'px-3 py-1 text-xs rounded-lg font-bold transition-all duration-200 flex items-center space-x-1.5 bg-blue-600 text-white shadow-md shadow-blue-600/30';
+                plusBtn.className = 'px-3 py-1 text-xs rounded-lg font-bold transition-all duration-200 flex items-center space-x-1.5 text-slate-400 hover:text-white';
+                
+                toSidebar.className = 'bg-blue-600 text-white flex flex-col items-center justify-start relative overflow-hidden';
+                fromSidebar.className = 'bg-blue-200 text-slate-900 flex flex-col items-center justify-center relative overflow-hidden flex-1';
+
+                if (dash1) dash1.className = 'w-[13px] h-[5px] bg-blue-600';
+                if (dash2) dash2.className = 'w-[13px] h-[5px] bg-blue-600';
+                if (dash3) dash3.className = 'w-[13px] h-[5px] bg-blue-600';
+                if (dash4) dash4.className = 'w-[13px] h-[5px] bg-blue-600';
+            } else {
+                lightBtn.className = 'px-3 py-1 text-xs rounded-lg font-bold transition-all duration-200 flex items-center space-x-1.5 text-slate-400 hover:text-white';
+                plusBtn.className = 'px-3 py-1 text-xs rounded-lg font-bold transition-all duration-200 flex items-center space-x-1.5 bg-red-600 text-white shadow-md shadow-red-600/30';
+
+                toSidebar.className = 'bg-red-600 text-white flex flex-col items-center justify-start relative overflow-hidden';
+                fromSidebar.className = 'bg-red-200 text-slate-900 flex flex-col items-center justify-center relative overflow-hidden flex-1';
+
+                if (dash1) dash1.className = 'w-[13px] h-[5px] bg-red-600';
+                if (dash2) dash2.className = 'w-[13px] h-[5px] bg-red-600';
+                if (dash3) dash3.className = 'w-[13px] h-[5px] bg-red-600';
+                if (dash4) dash4.className = 'w-[13px] h-[5px] bg-red-600';
+            }
+        }
+
+        // 電話番号整形用ヘルパー関数 (市外局番 - 市内局番 - 末尾4桁)
+        function formatTel(telStr) {
+            if (!telStr) return '';
+            const clean = String(telStr).trim();
+            if (clean.includes('-')) {
+                return clean.split('-').map(s => s.trim()).join(' - ');
+            }
+            const digits = clean.replace(/\D/g, '');
+            if (digits.length === 11) {
+                return `${digits.slice(0, 3)} - ${digits.slice(3, 7)} - ${digits.slice(7)}`;
+            } else if (digits.length === 10) {
+                if (digits.startsWith('03') || digits.startsWith('06')) {
+                    return `${digits.slice(0, 2)} - ${digits.slice(2, 6)} - ${digits.slice(6)}`;
+                } else {
+                    return `${digits.slice(0, 3)} - ${digits.slice(3, 6)} - ${digits.slice(6)}`;
+                }
+            }
+            return clean;
+        }
+
+        // ラベル反映
+        function renderLabel() {
+            // お届け先 郵便番号
+            const toZipVal = (document.getElementById('toZip').value || '').replace(/\D/g, '');
+            for (let i = 0; i < 7; i++) {
+                const box = document.getElementById(`zipBox${i}`);
+                if (box) box.textContent = toZipVal[i] || '';
+            }
+
+            // お届け先 テキスト
+            const toAddr1 = document.getElementById('toAddress1').value || '';
+            const toAddr2 = document.getElementById('toAddress2').value || '';
+            const toName = document.getElementById('toName').value || '';
+            const toHon = document.getElementById('toHonorific').value || '様';
+            const toTel = document.getElementById('toTel').value || '';
+
+            document.getElementById('displayToAddress1').textContent = toAddr1;
+            document.getElementById('displayToAddress2').textContent = toAddr2;
+            document.getElementById('displayToName').textContent = toName;
+            document.getElementById('displayToHonorific').textContent = toHon;
+            document.getElementById('displayToTel').textContent = formatTel(toTel);
+
+            // ご依頼主 郵便番号
+            const fromZipVal = (document.getElementById('fromZip').value || '').replace(/\D/g, '');
+            for (let i = 0; i < 7; i++) {
+                const box = document.getElementById(`fZip${i}`);
+                if (box) box.textContent = fromZipVal[i] || '';
+            }
+
+            // ご依頼主 テキスト
+            document.getElementById('displayFromAddress1').textContent = document.getElementById('fromAddress1').value || '';
+            document.getElementById('displayFromAddress2').textContent = document.getElementById('fromAddress2').value || '';
+            document.getElementById('displayFromName').textContent = document.getElementById('fromName').value || '';
+            document.getElementById('displayFromTel').textContent = formatTel(document.getElementById('fromTel').value || '');
+
+            // 品名
+            document.getElementById('displayItemContents').textContent = document.getElementById('itemContents').value || '';
+        }
+
+        function formatAndLookupToZip(val) {
+            renderLabel();
+            const clean = val.replace(/\D/g, '');
+            if (clean.length === 7) lookupZip('toZip', 'toAddress1');
+        }
+
+        function formatAndLookupFromZip(val) {
+            renderLabel();
+            const clean = val.replace(/\D/g, '');
+            if (clean.length === 7) lookupZip('fromZip', 'fromAddress1');
+        }
+
+        async function lookupZip(zipInputId, targetAddressId) {
+            const zipVal = document.getElementById(zipInputId).value.replace(/\D/g, '');
+            if (zipVal.length !== 7) return;
+
+            try {
+                const res = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${zipVal}`);
+                const data = await res.json();
+                if (data.results && data.results[0]) {
+                    const result = data.results[0];
+                    const fullAddr = `${result.address1}${result.address2}${result.address3}`;
+                    document.getElementById(targetAddressId).value = fullAddr;
+                    renderLabel();
+                }
+            } catch (e) {
+                console.error("郵便番号検索エラー", e);
+            }
+        }
+
+        function setPresetItem(text) {
+            document.getElementById('itemContents').value = text;
+            renderLabel();
+        }
+
+        function clearToForm() {
+            selectedAddressId = null;
+            document.getElementById('toZip').value = '';
+            document.getElementById('toAddress1').value = '';
+            document.getElementById('toAddress2').value = '';
+            document.getElementById('toName').value = '';
+            document.getElementById('toTel').value = '';
+            renderAddressBook();
+            renderLabel();
+        }
+
+        function saveSenderAddress() {
+            const data = {
+                zip: document.getElementById('fromZip').value,
+                addr1: document.getElementById('fromAddress1').value,
+                addr2: document.getElementById('fromAddress2').value,
+                name: document.getElementById('fromName').value,
+                tel: document.getElementById('fromTel').value
+            };
+            localStorage.setItem('letterpack_sender_data', JSON.stringify(data));
+            alert('ご依頼主（差出人）情報を保存しました。');
+        }
+
+        function loadSavedSender() {
+            try {
+                const saved = localStorage.getItem('letterpack_sender_data');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    if (data.zip) document.getElementById('fromZip').value = data.zip;
+                    if (data.addr1) document.getElementById('fromAddress1').value = data.addr1;
+                    if (data.addr2) document.getElementById('fromAddress2').value = data.addr2;
+                    if (data.name) document.getElementById('fromName').value = data.name;
+                    if (data.tel) document.getElementById('fromTel').value = data.tel;
+                }
+            } catch(e) {}
+        }
+
+        function updateScale(val) {
+            document.getElementById('scaleValueDisplay').textContent = `${parseFloat(val).toFixed(1)}%`;
+            const wrapper = document.getElementById('printScaleWrapper');
+            if (wrapper) {
+                const scale = parseFloat(val) / 100;
+                wrapper.style.transform = `scale(${scale})`;
+            }
+        }
+
+        function escapeHtml(str) {
+            return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function formatZip(zip) {
+            const clean = String(zip || '').replace(/\D/g, '');
+            if (clean.length === 7) return clean.slice(0, 3) + '-' + clean.slice(3);
+            return zip || '';
+        }
+    </script>
+</body>
+</html>
