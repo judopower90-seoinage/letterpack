@@ -260,6 +260,86 @@
                     </div>
                 </div>
 
+    <!-- アドレス編集モーダル（印刷除外） -->
+    <div id="editAddressModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 no-print">
+        <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200 space-y-3.5 text-slate-800 animate-in fade-in zoom-in-95 duration-150">
+            <div class="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                <h3 class="font-bold text-sm text-slate-800 flex items-center space-x-2">
+                    <span class="p-1 rounded-md bg-blue-50 text-blue-600 border border-blue-100">
+                        <i class="fa-solid fa-pen-to-square text-xs"></i>
+                    </span>
+                    <span>アドレス帳の編集</span>
+                </h3>
+                <button onclick="closeEditAddressModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+
+            <!-- 編集用隠しID -->
+            <input type="hidden" id="editAddrId">
+
+            <div class="space-y-2.5 text-xs">
+                <div>
+                    <label class="block font-medium text-slate-600 mb-1">郵便番号 (7桁)</label>
+                    <div class="flex space-x-2">
+                        <input type="text" id="editZip" maxlength="7" placeholder="1000001" class="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none font-mono text-sm tracking-wider">
+                        <button onclick="lookupZip('editZip', 'editAddr1')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl border border-slate-300 font-bold whitespace-nowrap transition-all flex items-center space-x-1">
+                            <i class="fa-solid fa-magnifying-glass text-[10px]"></i>
+                            <span>住所検索</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-medium text-slate-600 mb-1">住所1 (都道府県・市区町村・番地)</label>
+                    <input type="text" id="editAddr1" placeholder="東京都千代田区千代田1-1" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-all">
+                </div>
+
+                <div>
+                    <label class="block font-medium text-slate-600 mb-1">住所2 (建物名・部屋番号)</label>
+                    <input type="text" id="editAddr2" placeholder="皇居ビル 101号室" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-all">
+                </div>
+
+                <div class="flex space-x-2">
+                    <div class="flex-1">
+                        <label class="block font-medium text-slate-600 mb-1">お名前</label>
+                        <input type="text" id="editName" placeholder="日本 太郎" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none font-bold transition-all">
+                    </div>
+                    <div class="w-24">
+                        <label class="block font-medium text-slate-600 mb-1">敬称</label>
+                        <select id="editHonorific" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none font-bold transition-all">
+                            <option value="様">様</option>
+                            <option value="御中">御中</option>
+                            <option value="">(なし)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-medium text-slate-600 mb-1">電話番号</label>
+                    <input type="text" id="editTel" placeholder="03-1234-5678" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none font-mono">
+                </div>
+            </div>
+
+            <!-- アクションボタン -->
+            <div class="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
+                <button onclick="closeEditAddressModal()" class="px-3.5 py-1.5 text-xs font-bold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition">
+                    キャンセル
+                </button>
+                <button onclick="saveEditedAddress()" class="px-4 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl shadow-md shadow-blue-600/20 transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-check text-xs"></i>
+                    <span>変更を保存</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- トースト通知メッセージ表示用 -->
+    <div id="toastNotification" class="fixed bottom-5 right-5 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-2xl border border-slate-700 text-xs flex items-center space-x-2 z-50 transition-all duration-300 transform translate-y-20 opacity-0 pointer-events-none no-print">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span id="toastText">メッセージ</span>
+    </div>
+
                 <!-- 印刷補正用スケール設定 -->
                 <div class="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-sm space-y-2.5">
                     <div class="flex items-center justify-between">
@@ -722,9 +802,14 @@
                                 <div class="text-[11px] text-slate-600 truncate mt-0.5">${escapeHtml(item.addr1 || '')} ${escapeHtml(item.addr2 || '')}</div>
                             </div>
                         </div>
-                        <button onclick="event.stopPropagation(); deleteAddress('${item.id}')" title="削除" class="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg transition-all">
-                            <i class="fa-solid fa-trash-can text-xs"></i>
-                        </button>
+                        <div class="flex items-center space-x-0.5">
+                            <button onclick="event.stopPropagation(); openEditAddressModal('${item.id}')" title="編集" class="text-slate-400 hover:text-blue-600 p-1.5 rounded-lg transition-all">
+                                <i class="fa-solid fa-pen-to-square text-xs"></i>
+                            </button>
+                            <button onclick="event.stopPropagation(); deleteAddress('${item.id}')" title="削除" class="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg transition-all">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
+                        </div>
                     </div>
                 `;
             }).join('');
@@ -757,7 +842,7 @@
             const tel = document.getElementById('toTel')?.value.trim() || '';
 
             if (!name && !addr1) {
-                alert('お名前または住所を入力してください。');
+                showToast('お名前または住所を入力してください。', 'warning');
                 return;
             }
 
@@ -770,11 +855,66 @@
             selectedAddressId = newId;
 
             renderAddressBook();
-            alert('アドレス帳にお届け先を保存しました。');
+            showToast('アドレス帳にお届け先を保存しました。', 'success');
+        }
+
+        function openEditAddressModal(id) {
+            const book = getAddressBook();
+            const item = book.find(b => b.id === id);
+            if (!item) return;
+
+            document.getElementById('editAddrId').value = item.id;
+            document.getElementById('editZip').value = item.zip || '';
+            document.getElementById('editAddr1').value = item.addr1 || '';
+            document.getElementById('editAddr2').value = item.addr2 || '';
+            document.getElementById('editName').value = item.name || '';
+            document.getElementById('editHonorific').value = item.honorific !== undefined ? item.honorific : '様';
+            document.getElementById('editTel').value = item.tel || '';
+
+            const modal = document.getElementById('editAddressModal');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeEditAddressModal() {
+            const modal = document.getElementById('editAddressModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function saveEditedAddress() {
+            const id = document.getElementById('editAddrId')?.value;
+            if (!id) return;
+
+            const zip = document.getElementById('editZip')?.value.trim() || '';
+            const addr1 = document.getElementById('editAddr1')?.value.trim() || '';
+            const addr2 = document.getElementById('editAddr2')?.value.trim() || '';
+            const name = document.getElementById('editName')?.value.trim() || '';
+            const honorific = document.getElementById('editHonorific')?.value || '様';
+            const tel = document.getElementById('editTel')?.value.trim() || '';
+
+            if (!name && !addr1) {
+                showToast('お名前または住所を入力してください。', 'warning');
+                return;
+            }
+
+            let book = getAddressBook();
+            const index = book.findIndex(b => b.id === id);
+            if (index !== -1) {
+                book[index] = { ...book[index], zip, addr1, addr2, name, honorific, tel };
+                localStorage.setItem('letterpack_address_book', JSON.stringify(book));
+
+                // 編集中のものが現在フォームに選択されていたら反映
+                if (selectedAddressId === id) {
+                    selectAddress(id);
+                } else {
+                    renderAddressBook();
+                }
+
+                closeEditAddressModal();
+                showToast('アドレス帳の宛先を更新しました。', 'success');
+            }
         }
 
         function deleteAddress(id) {
-            if (!confirm('この宛先を削除してもよろしいですか？')) return;
             let book = getAddressBook();
             book = book.filter(item => item.id !== id);
             localStorage.setItem('letterpack_address_book', JSON.stringify(book));
@@ -783,6 +923,29 @@
                 selectedAddressId = null;
             }
             renderAddressBook();
+            showToast('宛先を削除しました。', 'info');
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toastNotification');
+            const text = document.getElementById('toastText');
+            const icon = document.getElementById('toastIcon');
+            if (!toast || !text) return;
+
+            text.textContent = message;
+            if (type === 'success') {
+                icon.className = 'fa-solid fa-circle-check text-emerald-400';
+            } else if (type === 'warning') {
+                icon.className = 'fa-solid fa-triangle-exclamation text-amber-400';
+            } else {
+                icon.className = 'fa-solid fa-circle-info text-blue-400';
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+            clearTimeout(window.__toastTimer);
+            window.__toastTimer = setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+            }, 2500);
         }
 
         // -------------------------------------------------------------
@@ -1077,7 +1240,7 @@
                 tel: document.getElementById('fromTel')?.value || ''
             };
             localStorage.setItem('letterpack_sender_data', JSON.stringify(data));
-            alert('ご依頼主（差出人）情報を保存しました。');
+            showToast('ご依頼主（差出人）情報を保存しました。', 'success');
         }
 
         function loadSavedSender() {
