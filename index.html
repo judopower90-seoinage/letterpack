@@ -996,7 +996,7 @@
             if (document.getElementById('displayToAddress2')) document.getElementById('displayToAddress2').textContent = toAddr2;
             if (document.getElementById('displayToName')) document.getElementById('displayToName').textContent = toName;
             if (document.getElementById('displayToHonorific')) document.getElementById('displayToHonorific').textContent = toHon;
-            if (document.getElementById('displayToTel')) document.getElementById('displayToTel').textContent = formatPhoneNumber(toTelRaw);
+            if (document.getElementById('displayToTel')) document.getElementById('displayToTel').textContent = toTelRaw;
 
             // ご依頼主 郵便番号 (7桁)
             const fromZipVal = (document.getElementById('fromZip')?.value || '').replace(/\D/g, '');
@@ -1010,25 +1010,14 @@
             if (document.getElementById('displayFromAddress1')) document.getElementById('displayFromAddress1').textContent = document.getElementById('fromAddress1')?.value || '';
             if (document.getElementById('displayFromAddress2')) document.getElementById('displayFromAddress2').textContent = document.getElementById('fromAddress2')?.value || '';
             if (document.getElementById('displayFromName')) document.getElementById('displayFromName').textContent = document.getElementById('fromName')?.value || '';
-            if (document.getElementById('displayFromTel')) document.getElementById('displayFromTel').textContent = formatPhoneNumber(fromTelRaw);
+            if (document.getElementById('displayFromTel')) document.getElementById('displayFromTel').textContent = fromTelRaw;
 
             // 品名
             if (document.getElementById('displayItemContents')) document.getElementById('displayItemContents').textContent = document.getElementById('itemContents')?.value || '';
         }
 
         function formatPhoneNumber(rawVal) {
-            const clean = String(rawVal || '').trim();
-            if (!clean) return '';
-            const digits = clean.replace(/\D/g, '');
-            
-            if (digits.length === 10) {
-                return `${digits.slice(0, 2)} - ${digits.slice(2, 6)} - ${digits.slice(6)}`;
-            } else if (digits.length === 11) {
-                return `${digits.slice(0, 3)} - ${digits.slice(3, 7)} - ${digits.slice(7)}`;
-            } else if (clean.includes('-')) {
-                return clean.split('-').join(' - ');
-            }
-            return clean;
+            return String(rawVal || '').trim();
         }
 
         function formatAndLookupToZip(val) {
